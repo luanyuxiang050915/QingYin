@@ -3,6 +3,7 @@ android/.gradle/
 android/build/
 android/app/build/
 android/local.properties
+android/keystore.properties
 android/.idea/
 *.iml
 .DS_Store

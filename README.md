@@ -12,6 +12,12 @@
 - 下载历史列表
 - 保存到相册「视频去水印」文件夹（Android 10+ 免存储权限）
 
+## 下载 APK（正式版 v0.1.0）
+
+[点击下载 QingYin-v0.1.0-release.apk](https://github.com/luanyuxiang050915/QingYin/raw/main/apk/QingYin-v0.1.0-release.apk)
+
+> 正式签名版，可直接安装使用。安装时如提示"未知来源应用"，允许即可。
+
 ## 目录结构
 
 - [计划书.md](计划书.md) — 立项评估与方案
