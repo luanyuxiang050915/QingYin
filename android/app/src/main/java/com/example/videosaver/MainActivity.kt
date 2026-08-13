@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,6 +29,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -40,17 +42,18 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -63,8 +66,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            VideoSaverTheme {
-                MainScreen()
+            var darkTheme by rememberSaveable { mutableStateOf(false) }
+            VideoSaverTheme(darkTheme = darkTheme) {
+                MainScreen(
+                    darkTheme = darkTheme,
+                    onToggleTheme = { darkTheme = !darkTheme },
+                )
             }
         }
     }
@@ -72,7 +79,11 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MainScreen(vm: MainViewModel = viewModel()) {
+private fun MainScreen(
+    darkTheme: Boolean,
+    onToggleTheme: () -> Unit,
+    vm: MainViewModel = viewModel(),
+) {
     val state by vm.state.collectAsState()
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
@@ -86,8 +97,20 @@ private fun MainScreen(vm: MainViewModel = viewModel()) {
     }
 
     Scaffold(
-        containerColor = Color(0xFFF0F2F7),
-        topBar = { CenterAlignedTopAppBar(title = { Text("清印") }) }
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = { CenterAlignedTopAppBar(title = { Text("清印") }) },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = onToggleTheme,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+            ) {
+                Text(
+                    text = if (darkTheme) "☀" else "🌙",
+                    fontSize = 20.sp,
+                )
+            }
+        }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -100,7 +123,7 @@ private fun MainScreen(vm: MainViewModel = viewModel()) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(28.dp))
-                    .background(Color.White)
+                    .background(MaterialTheme.colorScheme.surface)
                     .padding(16.dp)
             ) {
                 OutlinedTextField(
@@ -182,7 +205,7 @@ private fun MainScreen(vm: MainViewModel = viewModel()) {
                     .fillMaxWidth()
                     .weight(1f)
                     .clip(RoundedCornerShape(28.dp))
-                    .background(Color(0xFFE4EBFA))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
                     .padding(16.dp)
             ) {
                 Text(
@@ -199,7 +222,10 @@ private fun MainScreen(vm: MainViewModel = viewModel()) {
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
-                LazyColumn(modifier = Modifier.weight(1f)) {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(bottom = 80.dp)
+                ) {
                     items(completed) { task ->
                         HistoryItem(task, onDelete = { vm.deleteDownload(task.id) })
                     }
@@ -221,7 +247,7 @@ private fun VideoCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF3F6FE))
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
     ) {
         Column(Modifier.padding(12.dp)) {
             Row {
