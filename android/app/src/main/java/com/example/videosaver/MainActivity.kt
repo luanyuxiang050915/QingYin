@@ -1,11 +1,13 @@
 package com.example.videosaver
 
 import android.Manifest
+import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -38,6 +40,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,11 +53,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.videosaver.model.DownloadStatus
@@ -65,6 +70,8 @@ import com.example.videosaver.ui.theme.VideoSaverTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 全面屏：内容延伸到状态栏与导航栏后面
+        enableEdgeToEdge()
         setContent {
             var darkTheme by rememberSaveable { mutableStateOf(false) }
             VideoSaverTheme(darkTheme = darkTheme) {
@@ -84,10 +91,19 @@ private fun MainScreen(
     onToggleTheme: () -> Unit,
     vm: MainViewModel = viewModel(),
 ) {
+    val view = LocalView.current
     val state by vm.state.collectAsState()
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     var link by remember { mutableStateOf("") }
+
+    // 切换主题时同步状态栏/导航栏图标颜色（白天深色图标，夜晚浅色图标）
+    LaunchedEffect(darkTheme) {
+        val window = (view.context as Activity).window
+        val controller = WindowCompat.getInsetsController(window, view)
+        controller.isAppearanceLightStatusBars = !darkTheme
+        controller.isAppearanceLightNavigationBars = !darkTheme
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
