@@ -82,7 +82,7 @@ private fun MainScreen(vm: MainViewModel = viewModel()) {
     }
 
     Scaffold(
-        topBar = { CenterAlignedTopAppBar(title = { Text("视频去水印下载") }) }
+        topBar = { CenterAlignedTopAppBar(title = { Text("清印") }) }
     ) { padding ->
         Column(
             modifier = Modifier
