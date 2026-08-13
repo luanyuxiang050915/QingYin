@@ -22,8 +22,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
@@ -42,9 +44,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -82,6 +86,7 @@ private fun MainScreen(vm: MainViewModel = viewModel()) {
     }
 
     Scaffold(
+        containerColor = Color(0xFFF0F2F7),
         topBar = { CenterAlignedTopAppBar(title = { Text("清印") }) }
     ) { padding ->
         Column(
@@ -90,81 +95,114 @@ private fun MainScreen(vm: MainViewModel = viewModel()) {
                 .padding(padding)
                 .padding(16.dp)
         ) {
-            OutlinedTextField(
-                value = link,
-                onValueChange = { link = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("粘贴抖音 / B站 分享链接") },
-                minLines = 3,
-                maxLines = 6,
-                placeholder = {
-                    Text("例如：\n0.53 复制打开抖音... https://v.douyin.com/xxxxx/ ...")
-                }
-            )
-
-            Spacer(Modifier.height(8.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
+            // 顶部块：粘贴链接 + 两个按钮
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(Color.White)
+                    .padding(16.dp)
             ) {
-                OutlinedButton(
-                    onClick = {
-                        if (link.isBlank()) {
-                            clipboard.getText()?.text?.takeIf { it.isNotBlank() }?.let {
-                                link = it
-                            }
-                        } else {
-                            link = ""
-                        }
+                OutlinedTextField(
+                    value = link,
+                    onValueChange = { link = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("粘贴抖音 / B站 分享链接") },
+                    minLines = 2,
+                    maxLines = 4,
+                    placeholder = {
+                        Text("例如：\n0.53 复制打开抖音... https://v.douyin.com/xxxxx/ ...")
                     }
-                ) { Text(if (link.isBlank()) "粘贴" else "清空") }
-                Button(
-                    onClick = { vm.parse(link) },
-                    enabled = !state.parsing,
-                    modifier = Modifier.weight(1f)
-                ) { Text(if (state.parsing) "解析中..." else "解析") }
-            }
-
-            if (state.parsing) {
-                Spacer(Modifier.height(8.dp))
-                LinearProgressIndicator(Modifier.fillMaxWidth())
-            }
-
-            state.message?.let {
-                Spacer(Modifier.height(8.dp))
-                Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
-            }
-
-            state.video?.let { video ->
-                Spacer(Modifier.height(12.dp))
-                val task = state.tasks.firstOrNull { it.video.videoUrl == video.videoUrl }
-                VideoCard(
-                    video = video,
-                    task = task,
-                    onDownload = {
-                        val needPermission =
-                            Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
-                                ContextCompat.checkSelfPermission(
-                                    context,
-                                    Manifest.permission.WRITE_EXTERNAL_STORAGE
-                                ) != PackageManager.PERMISSION_GRANTED
-                        if (needPermission) {
-                            permissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                        } else {
-                            vm.startDownload()
-                        }
-                    },
-                    onPause = { task?.let { vm.pauseDownload(it.id) } },
-                    onResume = { task?.let { vm.resumeDownload(it.id) } },
-                    onDelete = { task?.let { vm.deleteDownload(it.id) } }
                 )
+
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            if (link.isBlank()) {
+                                clipboard.getText()?.text?.takeIf { it.isNotBlank() }?.let {
+                                    link = it
+                                }
+                            } else {
+                                link = ""
+                            }
+                        }
+                    ) { Text(if (link.isBlank()) "粘贴" else "清空") }
+                    Button(
+                        onClick = { vm.parse(link) },
+                        enabled = !state.parsing,
+                        modifier = Modifier.weight(1f)
+                    ) { Text(if (state.parsing) "解析中..." else "解析") }
+                }
+
+                if (state.parsing) {
+                    Spacer(Modifier.height(8.dp))
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                }
+
+                state.message?.let {
+                    Spacer(Modifier.height(8.dp))
+                    Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+                }
+
+                state.video?.let { video ->
+                    Spacer(Modifier.height(12.dp))
+                    val task = state.tasks.firstOrNull { it.video.videoUrl == video.videoUrl }
+                    VideoCard(
+                        video = video,
+                        task = task,
+                        onDownload = {
+                            val needPermission =
+                                Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+                                    ContextCompat.checkSelfPermission(
+                                        context,
+                                        Manifest.permission.WRITE_EXTERNAL_STORAGE
+                                    ) != PackageManager.PERMISSION_GRANTED
+                            if (needPermission) {
+                                permissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                            } else {
+                                vm.startDownload()
+                            }
+                        },
+                        onPause = { task?.let { vm.pauseDownload(it.id) } },
+                        onResume = { task?.let { vm.resumeDownload(it.id) } },
+                        onDelete = { task?.let { vm.deleteDownload(it.id) } }
+                    )
+                }
             }
 
-            Spacer(Modifier.height(16.dp))
-            Text("下载历史", style = MaterialTheme.typography.titleMedium)
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                items(state.tasks.filter { it.status == DownloadStatus.COMPLETED }) { task ->
-                    HistoryItem(task, onDelete = { vm.deleteDownload(task.id) })
+            Spacer(Modifier.height(12.dp))
+
+            // 底部块：下载历史
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(Color(0xFFE4EBFA))
+                    .padding(16.dp)
+            ) {
+                Text(
+                    "下载历史",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(8.dp))
+                val completed = state.tasks.filter { it.status == DownloadStatus.COMPLETED }
+                if (completed.isEmpty()) {
+                    Text(
+                        "还没有下载记录",
+                        color = MaterialTheme.colorScheme.outline,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                LazyColumn(modifier = Modifier.weight(1f)) {
+                    items(completed) { task ->
+                        HistoryItem(task, onDelete = { vm.deleteDownload(task.id) })
+                    }
                 }
             }
         }
@@ -180,7 +218,11 @@ private fun VideoCard(
     onResume: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF3F6FE))
+    ) {
         Column(Modifier.padding(12.dp)) {
             Row {
                 AsyncImage(
