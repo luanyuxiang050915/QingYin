@@ -20,7 +20,7 @@ object WeiboParser : VideoParser {
     override fun matches(text: String): Boolean =
         Regex("(weibo\\.com|weibo\\.cn)").containsMatchIn(text)
 
-    override suspend fun parse(text: String): VideoInfo {
+    override suspend fun parse(text: String, context: android.content.Context): VideoInfo {
         val rawUrl = urlRegex.find(text)?.value
             ?: throw ParseException("未找到微博链接，请粘贴分享链接")
         if (tvRegex.containsMatchIn(rawUrl)) {

@@ -20,7 +20,7 @@ object DouyinParser : VideoParser {
         Regex("(v\\.douyin\\.com|www\\.douyin\\.com|iesdouyin\\.com|douyin\\.com)")
             .containsMatchIn(text)
 
-    override suspend fun parse(text: String): VideoInfo {
+    override suspend fun parse(text: String, context: android.content.Context): VideoInfo {
         val rawUrl = urlRegex.find(text)?.value
             ?: throw ParseException("未找到抖音链接，请粘贴完整的分享文本")
         val client = Http.client
@@ -35,16 +35,24 @@ object DouyinParser : VideoParser {
 
         val videoId = idRegex.find(finalUrl)?.groupValues?.get(1)
             ?: modalIdRegex.find(finalUrl)?.groupValues?.get(1)
-            ?: throw ParseException("无法从链接中提取视频 ID：$finalUrl")
+            ?: throw ParseException("无法从链接中提取作品 ID：$finalUrl")
 
-        // 多策略尝试：裸分享页 -> 带完整参数的跳转链接 -> 桌面 UA 重试
-        val shareUrl = "https://www.iesdouyin.com/share/video/$videoId/"
+        // 图集（/note/）和视频（/video/）对应不同的分享页，多策略尝试提高成功率
+        val isNote = finalUrl.contains("/note/")
+        val shareUrl = if (isNote) {
+            "https://www.iesdouyin.com/share/note/$videoId/"
+        } else {
+            "https://www.iesdouyin.com/share/video/$videoId/"
+        }
+        val fallbackShareUrl = if (isNote) {
+            "https://www.iesdouyin.com/share/video/$videoId/"
+        } else {
+            "https://www.iesdouyin.com/share/note/$videoId/"
+        }
         val attempts = mutableListOf<Pair<String, String>>()
         attempts.add(shareUrl to "分享页")
         fullShareUrl?.let { attempts.add(it to "完整跳转链接") }
-        if (attempts.size == 1) {
-            attempts.add(shareUrl to "桌面UA重试")
-        }
+        attempts.add(fallbackShareUrl to "备用分享页")
 
         var lastError: Exception? = null
         for ((url, label) in attempts) {
@@ -96,21 +104,71 @@ object DouyinParser : VideoParser {
             throw ParseException("$label: 页面数据解析失败")
         }
 
-        val playAddr = findFirstObject(root, "play_addr")
-            ?: throw ParseException("未找到播放地址")
-        val wmUrl = playAddr.optJSONArray("url_list")?.let { arr ->
-            (0 until arr.length()).firstNotNullOfOrNull { i ->
-                arr.optString(i).takeIf { it.isNotBlank() }
-            }
-        } ?: throw ParseException("播放地址为空")
-
-        val cleanUrl = wmUrl.replace("playwm", "play")
-        val title = (findFirstString(root, "desc") ?: "").trim().ifBlank { "抖音视频" }
+        val title = (findFirstString(root, "desc") ?: "").trim().ifBlank { "抖音作品" }
         val author = (findFirstString(root, "nickname") ?: "").trim()
-        val cover = findCoverUrl(root)
-        val duration = findFirstLong(root, "duration") ?: 0
 
-        return VideoInfo(platform, title, author, cover, cleanUrl, duration)
+        // 优先按视频解析：有 play_addr 的就是视频（保持原有行为）
+        val playAddr = findFirstObject(root, "play_addr")
+        if (playAddr != null) {
+            val wmUrl = playAddr.optJSONArray("url_list")?.let { arr ->
+                (0 until arr.length()).firstNotNullOfOrNull { i ->
+                    arr.optString(i).takeIf { it.isNotBlank() }
+                }
+            } ?: throw ParseException("播放地址为空")
+
+            val cleanUrl = wmUrl.replace("playwm", "play")
+            val cover = findCoverUrl(root)
+            val duration = findFirstLong(root, "duration") ?: 0
+            return VideoInfo(platform, title, author, cover, cleanUrl, duration)
+        }
+
+        // 没有播放地址则是图文笔记：images 数组的 url_list 就是无水印原图直链
+        val images = findImageUrls(root)
+        if (images.isNotEmpty()) {
+            val cover = findCoverUrl(root).ifBlank { images.first() }
+            return VideoInfo(
+                platform = platform,
+                title = title,
+                author = author,
+                coverUrl = cover,
+                videoUrl = "",
+                durationSec = 0,
+                imageUrls = images,
+            )
+        }
+        throw ParseException("未找到视频或图片地址")
+    }
+
+    /** 递归查找图文作品的 images 数组，提取每张图 url_list 中第一个可用直链 */
+    private fun findImageUrls(node: Any?): List<String> {
+        when (node) {
+            is JSONObject -> {
+                val arr = node.optJSONArray("images")
+                if (arr != null && arr.length() > 0) {
+                    val urls = mutableListOf<String>()
+                    for (i in 0 until arr.length()) {
+                        val urlList = arr.optJSONObject(i)?.optJSONArray("url_list") ?: continue
+                        val url = (0 until urlList.length()).firstNotNullOfOrNull { j ->
+                            urlList.optString(j).takeIf { it.isNotBlank() }
+                        } ?: continue
+                        urls.add(url)
+                    }
+                    if (urls.isNotEmpty()) return urls
+                }
+                val iter = node.keys()
+                while (iter.hasNext()) {
+                    val r = findImageUrls(node.opt(iter.next()))
+                    if (r.isNotEmpty()) return r
+                }
+            }
+            is JSONArray -> {
+                for (i in 0 until node.length()) {
+                    val r = findImageUrls(node.opt(i))
+                    if (r.isNotEmpty()) return r
+                }
+            }
+        }
+        return emptyList()
     }
 
     private fun findFirstObject(node: Any?, key: String): JSONObject? {

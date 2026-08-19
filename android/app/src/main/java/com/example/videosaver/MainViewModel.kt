@@ -42,10 +42,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _state.update { it.copy(parsing = true, message = null, video = null) }
             try {
-                // 网络请求必须在 IO 线程执行，否则安卓会直接拦截（NetworkOnMainThreadException）
-                val video = withContext(Dispatchers.IO) {
-                    VideoParserManager.parse(text.trim())
-                }
+                // 解析器内部自行调度线程：抖音失败会回退 WebView 方案（需主线程创建 WebView），
+                // 其余平台在 IO 线程执行网络请求
+                val video = VideoParserManager.parse(text.trim(), getApplication())
                 _state.update {
                     it.copy(parsing = false, video = video, message = "解析成功，可开始下载")
                 }
@@ -101,9 +100,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _state.update { s -> s.copy(tasks = s.tasks.filterNot { it.id == id }) }
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                task.file?.let { f -> if (f.exists()) f.delete() }
+                task.file?.let { f ->
+                    if (f.exists()) {
+                        // 图集的临时文件是一个目录
+                        if (f.isDirectory) f.deleteRecursively() else f.delete()
+                    }
+                }
                 if (task.status == DownloadStatus.COMPLETED) {
-                    saver.deleteSaved(task.savedUri)
+                    task.savedUris.forEach { saver.deleteSaved(it) }
                 }
             }
         }
@@ -118,6 +122,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 .replace(Regex("[\\\\/:*?\"<>|]"), "_")
                 .take(40)
                 .ifBlank { "video" }
+            // 图集走单独的逐张下载流程
+            if (video.imageUrls.isNotEmpty()) {
+                runImageDownload(id, video, dir, safeTitle)
+                return@launch
+            }
+
             // 文件名带任务 id，暂停后继续用同一个文件实现断点续传
             val file = File(dir, "${safeTitle}_$id.mp4")
 
@@ -184,7 +194,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                         it.copy(
                                             status = DownloadStatus.COMPLETED,
                                             progress = 1f,
-                                            savedUri = uri,
+                                            savedUris = listOf(uri),
                                             file = null,
                                         )
                                     } else {
@@ -209,5 +219,124 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+    }
+
+    /**
+     * 图集下载：逐张下载到临时目录（已下载完整的跳过，实现断点续传），
+     * 全部完成后统一存入相册再清理临时文件。
+     * 单张图片很小，暂停在两张图片之间生效；不完整的图片会被删除，重试时重新下载。
+     */
+    private suspend fun runImageDownload(id: Long, video: VideoInfo, parentDir: File, safeTitle: String) {
+        val imgDir = File(parentDir, "${safeTitle}_$id").apply { mkdirs() }
+        _state.update { s ->
+            s.copy(
+                tasks = s.tasks.map {
+                    if (it.id == id) {
+                        it.copy(status = DownloadStatus.DOWNLOADING, file = imgDir, error = null)
+                    } else {
+                        it
+                    }
+                }
+            )
+        }
+
+        val total = video.imageUrls.size
+        try {
+            var paused = false
+            for ((index, url) in video.imageUrls.withIndex()) {
+                val stopped = _state.value.tasks.firstOrNull { it.id == id }?.status !=
+                    DownloadStatus.DOWNLOADING
+                if (stopped) {
+                    paused = true
+                    break
+                }
+                val ext = when {
+                    url.contains(".webp") -> "webp"
+                    url.contains(".png") -> "png"
+                    else -> "jpg"
+                }
+                val dest = File(imgDir, "${safeTitle}_${id}_${(index + 1).toString().padStart(2, '0')}.$ext")
+                if (dest.exists()) {
+                    // 之前已完整下载的图片直接跳过
+                    updateImageProgress(id, (index + 1).toFloat() / total)
+                    continue
+                }
+                try {
+                    downloader.download(
+                        url = url,
+                        dest = dest,
+                        onProgress = { downloaded, totalBytes ->
+                            val per =
+                                if (totalBytes > 0) (downloaded.toFloat() / totalBytes).coerceIn(0f, 1f) else 0f
+                            updateImageProgress(id, (index + per) / total)
+                        },
+                        shouldStop = { false },
+                    )
+                } catch (e: Exception) {
+                    dest.delete()
+                    throw e
+                }
+            }
+
+            if (paused) {
+                _state.update { s ->
+                    s.copy(
+                        tasks = s.tasks.map {
+                            if (it.id == id) it.copy(status = DownloadStatus.PAUSED) else it
+                        }
+                    )
+                }
+                return
+            }
+
+            val files = imgDir.listFiles()?.filter { it.isFile }?.sortedBy { it.name }.orEmpty()
+            val uris = files.map { saver.saveToGallery(it, imageMime(it.name)) }
+            imgDir.deleteRecursively()
+            _state.update { s ->
+                s.copy(
+                    message = "已保存 ${uris.size} 张图片到相册「视频去水印」",
+                    tasks = s.tasks.map {
+                        if (it.id == id) {
+                            it.copy(
+                                status = DownloadStatus.COMPLETED,
+                                progress = 1f,
+                                savedUris = uris,
+                                file = null,
+                            )
+                        } else {
+                            it
+                        }
+                    }
+                )
+            }
+        } catch (e: Exception) {
+            _state.update { s ->
+                s.copy(
+                    tasks = s.tasks.map {
+                        if (it.id == id) {
+                            it.copy(status = DownloadStatus.FAILED, error = e.message ?: "下载失败")
+                        } else {
+                            it
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    private fun updateImageProgress(id: Long, progress: Float) {
+        _state.update { s ->
+            s.copy(
+                tasks = s.tasks.map {
+                    if (it.id == id) it.copy(progress = progress.coerceIn(0f, 1f)) else it
+                }
+            )
+        }
+    }
+
+    private fun imageMime(fileName: String): String = when {
+        fileName.endsWith(".webp") -> "image/webp"
+        fileName.endsWith(".png") -> "image/png"
+        else -> "image/jpeg"
     }
 }

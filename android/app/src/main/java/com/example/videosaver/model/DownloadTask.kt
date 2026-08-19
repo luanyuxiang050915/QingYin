@@ -18,6 +18,7 @@ data class DownloadTask(
     val bytesDownloaded: Long = 0,
     val totalBytes: Long = 0,
     val file: File? = null,
-    val savedUri: Uri? = null,
+    /** 已保存到相册的媒体 Uri；视频只有 1 个，图集有多张 */
+    val savedUris: List<Uri> = emptyList(),
     val error: String? = null,
 )

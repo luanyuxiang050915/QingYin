@@ -17,7 +17,7 @@ object XParser : VideoParser {
     override fun matches(text: String): Boolean =
         Regex("(x\\.com|twitter\\.com|t\\.co)").containsMatchIn(text)
 
-    override suspend fun parse(text: String): VideoInfo {
+    override suspend fun parse(text: String, context: android.content.Context): VideoInfo {
         var statusUrl = statusRegex.find(text)?.value
         if (statusUrl == null) {
             // t.co 短链：跟随跳转拿真实推文链接

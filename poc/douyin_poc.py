@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""抖音解析 POC：分享文本 -> 标题、作者、无水印视频直链（仅用标准库）"""
+"""抖音解析 POC：分享文本 -> 标题、作者、无水印视频直链 / 图集原图直链（仅用标准库）"""
 import json
 import re
 import sys
@@ -51,6 +51,33 @@ def find_cover(node):
     return ""
 
 
+def find_images(node):
+    """递归查找图文作品的 images 数组，提取每张图 url_list 中第一个可用直链"""
+    if isinstance(node, dict):
+        imgs = node.get("images")
+        if isinstance(imgs, list) and imgs:
+            urls = []
+            for img in imgs:
+                if not isinstance(img, dict):
+                    continue
+                for u in img.get("url_list") or []:
+                    if u:
+                        urls.append(u)
+                        break
+            if urls:
+                return urls
+        for v in node.values():
+            r = find_images(v)
+            if r:
+                return r
+    elif isinstance(node, list):
+        for v in node:
+            r = find_images(v)
+            if r:
+                return r
+    return []
+
+
 def parse(text):
     raw_url = URL_RE.search(text)
     if not raw_url:
@@ -62,13 +89,25 @@ def parse(text):
 
     m = ID_RE.search(url) or MODAL_ID_RE.search(url)
     if not m:
-        raise ValueError(f"无法从链接中提取视频 ID：{url}")
+        raise ValueError(f"无法从链接中提取作品 ID：{url}")
     video_id = m.group(1)
 
-    html, _ = fetch_text(
-        f"https://www.iesdouyin.com/share/video/{video_id}/",
-        referer="https://www.douyin.com/",
-    )
+    # 图集（/note/）和视频（/video/）对应不同的分享页，失败时互换兜底
+    is_note = "/note/" in url
+    kinds = ["note", "video"] if is_note else ["video", "note"]
+    html = None
+    for kind in kinds:
+        try:
+            html, _ = fetch_text(
+                f"https://www.iesdouyin.com/share/{kind}/{video_id}/",
+                referer="https://www.douyin.com/",
+            )
+            break
+        except Exception:
+            continue
+    if html is None:
+        raise ValueError("抖音页面请求失败（可能被风控），请稍后再试")
+
     m = re.search(
         r"<script[^>]*>\s*window\._ROUTER_DATA\s*=\s*(.*?)</script>",
         html,
@@ -78,20 +117,37 @@ def parse(text):
         raise ValueError("抖音页面数据缺失（可能被风控），请稍后再试")
     root = json.loads(m.group(1).strip().rstrip(";"))
 
-    play_addr = find_first(root, "play_addr")
-    if not play_addr:
-        raise ValueError("未找到播放地址")
-    wm_url = play_addr["url_list"][0]
-    no_wm_url = wm_url.replace("playwm", "play")
+    title = (find_first(root, "desc") or "").strip() or "抖音作品"
+    author = (find_first(root, "nickname") or "").strip()
 
-    return {
-        "platform": "抖音",
-        "title": (find_first(root, "desc") or "").strip() or "抖音视频",
-        "author": (find_first(root, "nickname") or "").strip(),
-        "cover": find_cover(root),
-        "video_url": no_wm_url,
-        "duration_sec": find_first(root, "duration") or 0,
-    }
+    # 优先按视频解析：有 play_addr 的就是视频
+    play_addr = find_first(root, "play_addr")
+    if play_addr:
+        wm_url = play_addr["url_list"][0]
+        no_wm_url = wm_url.replace("playwm", "play")
+        return {
+            "platform": "抖音",
+            "type": "视频",
+            "title": title,
+            "author": author,
+            "cover": find_cover(root),
+            "video_url": no_wm_url,
+            "duration_sec": find_first(root, "duration") or 0,
+        }
+
+    # 没有播放地址则是图文笔记：images 数组的 url_list 就是无水印原图直链
+    images = find_images(root)
+    if images:
+        return {
+            "platform": "抖音",
+            "type": "图集",
+            "title": title,
+            "author": author,
+            "cover": find_cover(root) or images[0],
+            "image_urls": images,
+            "duration_sec": 0,
+        }
+    raise ValueError("未找到视频或图片地址")
 
 
 if __name__ == "__main__":

@@ -146,11 +146,11 @@ private fun MainScreen(
                     value = link,
                     onValueChange = { link = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("粘贴抖音 / B站 分享链接") },
+                    label = { Text("粘贴分享链接") },
                     minLines = 2,
                     maxLines = 4,
                     placeholder = {
-                        Text("例如：\n0.53 复制打开抖音... https://v.douyin.com/xxxxx/ ...")
+                        Text("支持：抖音（视频/图集）/ B站 / 快手 / X / 小红书 / 微博\n例如：0.53 复制打开抖音... https://v.douyin.com/xxxxx/ ...")
                     }
                 )
 
@@ -189,7 +189,10 @@ private fun MainScreen(
 
                 state.video?.let { video ->
                     Spacer(Modifier.height(12.dp))
-                    val task = state.tasks.firstOrNull { it.video.videoUrl == video.videoUrl }
+                    // 图集作品 videoUrl 为空，需同时比对图片列表才能匹配到对应任务
+                    val task = state.tasks.firstOrNull {
+                        it.video.videoUrl == video.videoUrl && it.video.imageUrls == video.imageUrls
+                    }
                     VideoCard(
                         video = video,
                         task = task,
@@ -285,7 +288,8 @@ private fun VideoCard(
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        text = "${video.platform} · ${video.author.ifBlank { "未知作者" }}",
+                        text = "${video.platform} · ${video.author.ifBlank { "未知作者" }}" +
+                            if (video.imageUrls.isNotEmpty()) " · 图集 ${video.imageUrls.size} 张" else "",
                         style = MaterialTheme.typography.bodySmall
                     )
                     if (video.durationSec > 0) {
@@ -300,7 +304,13 @@ private fun VideoCard(
             when {
                 task == null -> {
                     Button(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
-                        Text("下载无水印视频")
+                        Text(
+                            if (video.imageUrls.isNotEmpty()) {
+                                "下载无水印图片（${video.imageUrls.size} 张）"
+                            } else {
+                                "下载无水印视频"
+                            }
+                        )
                     }
                 }
                 task.status == DownloadStatus.DOWNLOADING ||
@@ -335,7 +345,11 @@ private fun VideoCard(
                 }
                 task.status == DownloadStatus.COMPLETED -> {
                     Text(
-                        text = "已保存到相册「视频去水印」",
+                        text = if (task.video.imageUrls.isNotEmpty()) {
+                            "已保存 ${task.video.imageUrls.size} 张图片到相册「视频去水印」"
+                        } else {
+                            "已保存到相册「视频去水印」"
+                        },
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodySmall
                     )

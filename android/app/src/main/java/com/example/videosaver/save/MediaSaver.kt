@@ -16,33 +16,44 @@ class MediaSaver(private val context: Context) {
 
     /**
      * Android 10+ 用 MediaStore 保存（无需存储权限）；
-     * Android 8/9 写入公共 Movies 目录后触发媒体扫描。
+     * Android 8/9 写入公共目录后触发媒体扫描。
+     * 按 mime 类型分流：视频存 Movies，图片存 Pictures，统一放在「视频去水印」目录。
      */
     suspend fun saveToGallery(file: File, mime: String = "video/mp4"): Uri =
         withContext(Dispatchers.IO) {
+            val isImage = mime.startsWith("image/")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val values = ContentValues().apply {
-                    put(MediaStore.Video.Media.DISPLAY_NAME, file.name)
-                    put(MediaStore.Video.Media.MIME_TYPE, mime)
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, file.name)
+                    put(MediaStore.MediaColumns.MIME_TYPE, mime)
                     put(
-                        MediaStore.Video.Media.RELATIVE_PATH,
-                        Environment.DIRECTORY_MOVIES + "/视频去水印"
+                        MediaStore.MediaColumns.RELATIVE_PATH,
+                        (if (isImage) Environment.DIRECTORY_PICTURES
+                        else Environment.DIRECTORY_MOVIES) + "/视频去水印"
                     )
-                    put(MediaStore.Video.Media.IS_PENDING, 1)
+                    put(MediaStore.MediaColumns.IS_PENDING, 1)
+                }
+                val collection = if (isImage) {
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+                } else {
+                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI
                 }
                 val resolver = context.contentResolver
-                val uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
+                val uri = resolver.insert(collection, values)
                     ?: throw IOException("无法创建媒体条目")
                 resolver.openOutputStream(uri)?.use { out ->
                     file.inputStream().use { it.copyTo(out) }
                 } ?: throw IOException("无法写入媒体库")
                 values.clear()
-                values.put(MediaStore.Video.Media.IS_PENDING, 0)
+                values.put(MediaStore.MediaColumns.IS_PENDING, 0)
                 resolver.update(uri, values, null, null)
                 uri
             } else {
                 val dir = File(
-                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
+                    Environment.getExternalStoragePublicDirectory(
+                        if (isImage) Environment.DIRECTORY_PICTURES
+                        else Environment.DIRECTORY_MOVIES
+                    ),
                     "视频去水印"
                 )
                 if (!dir.exists() && !dir.mkdirs()) throw IOException("无法创建保存目录")
