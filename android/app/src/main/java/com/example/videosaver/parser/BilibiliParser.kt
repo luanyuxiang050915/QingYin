@@ -14,7 +14,7 @@ object BilibiliParser : VideoParser {
     override fun matches(text: String): Boolean =
         Regex("(bilibili\\.com|b23\\.tv)").containsMatchIn(text)
 
-    override suspend fun parse(text: String, context: android.content.Context): VideoInfo {
+    override suspend fun parse(text: String): VideoInfo {
         var input = text
 
         b23Regex.find(input)?.let { short ->

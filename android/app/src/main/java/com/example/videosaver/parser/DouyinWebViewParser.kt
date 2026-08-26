@@ -48,7 +48,7 @@ class DouyinWebViewParser(private val appContext: Context) : VideoParser {
         Regex("(v\\.douyin\\.com|www\\.douyin\\.com|iesdouyin\\.com|douyin\\.com)")
             .containsMatchIn(text)
 
-    override suspend fun parse(text: String, context: Context): VideoInfo {
+    override suspend fun parse(text: String): VideoInfo {
         // 1) 提取作品 ID 与类型（网络请求放 IO）
         val (awemeId, isNote) = withContext(Dispatchers.IO) { extractId(text) }
         // 2) WebView 必须在主线程创建与操作

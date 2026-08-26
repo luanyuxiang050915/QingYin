@@ -7,10 +7,11 @@ import kotlinx.coroutines.withContext
 
 class ParseException(message: String) : Exception(message)
 
+/** 平台解析器：纯 JVM 代码，可在 Android 与桌面版间复用 */
 interface VideoParser {
     val platform: String
     fun matches(text: String): Boolean
-    suspend fun parse(text: String, context: Context): VideoInfo
+    suspend fun parse(text: String): VideoInfo
 }
 
 object VideoParserManager {
@@ -29,7 +30,7 @@ object VideoParserManager {
     /**
      * 解析分享文本为作品信息。
      * - 抖音：先走快路径（解析分享页内嵌数据，纯网络请求），失败后回退到
-     *   [DouyinWebViewParser]（WebView 真实浏览器，适配平台签名/风控改版）。
+     *   [DouyinWebViewParser]（WebView 真实浏览器，适配平台签名/风控改版，仅 Android）。
      * - 其余平台：网络请求放 IO 线程。
      */
     suspend fun parse(text: String, context: Context): VideoInfo {
@@ -37,11 +38,11 @@ object VideoParserManager {
             ?: throw ParseException("暂不支持该链接，目前支持：抖音 / B站 / 快手 / X(推特) / 小红书 / 微博")
         if (parser is DouyinParser) {
             return try {
-                withContext(Dispatchers.IO) { parser.parse(text, context) }
+                withContext(Dispatchers.IO) { parser.parse(text) }
             } catch (e: ParseException) {
-                DouyinWebViewParser(context).parse(text, context)
+                DouyinWebViewParser(context).parse(text)
             }
         }
-        return withContext(Dispatchers.IO) { parser.parse(text, context) }
+        return withContext(Dispatchers.IO) { parser.parse(text) }
     }
 }

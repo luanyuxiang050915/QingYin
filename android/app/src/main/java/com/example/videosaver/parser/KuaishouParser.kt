@@ -16,7 +16,7 @@ object KuaishouParser : VideoParser {
     override fun matches(text: String): Boolean =
         Regex("(kuaishou\\.com|gifshow\\.com)").containsMatchIn(text)
 
-    override suspend fun parse(text: String, context: android.content.Context): VideoInfo {
+    override suspend fun parse(text: String): VideoInfo {
         val rawUrl = urlRegex.find(text)?.value
             ?: throw ParseException("未找到快手链接，请粘贴完整的分享文本")
 

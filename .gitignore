@@ -9,3 +9,7 @@ android/.idea/
 .DS_Store
 __pycache__/
 *.pyc
+
+# Desktop
+desktop/.gradle/
+desktop/build/

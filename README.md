@@ -1,6 +1,6 @@
-# 清印 QingYin · 视频下载去水印（Android）
+# 清印 QingYin · 视频下载去水印（Android / Windows 桌面版）
 
-粘贴分享链接，一键下载无水印视频与抖音图集。支持 **抖音 / B站 / 快手 / X(推特) / 小红书 / 微博** 六个平台。
+粘贴分享链接，一键下载无水印视频与抖音图集。支持 **抖音 / B站 / 快手 / X(推特) / 小红书 / 微博** 六个平台（桌面版支持其中 5 个，详见[桌面版](#桌面版windows)）。
 
 ## 功能特性
 
@@ -31,6 +31,17 @@
   - `lib/` — a_bogus 签名算法 JS 参考实现（Apache-2.0）
   - `debug_*.py` — 历次排查用的诊断脚本（留存备查）
 - `android/` — Android Studio 工程（Kotlin + Jetpack Compose）
+- `desktop/` — Windows 桌面版工程（Compose Desktop + jpackage，复用 Android 版解析器源码）
+
+## 桌面版（Windows）
+
+清印提供 **Windows 桌面版**（`desktop/` 工程，Compose Desktop + jpackage），无需安装 Java 即可运行：
+
+- **功能**：粘贴链接 → 解析 → 下载无水印视频 / 图集 → 保存到「下载\视频去水印」文件夹；支持 **B站 / 快手 / X(推特) / 小红书 / 微博**（抖音桌面版暂不支持，详见[维护记录](#六维护记录2026-08-抖音改版)）
+- **可执行文件**：`desktop/build/jpackage-app/QingYin/QingYin.exe`（或分发包 `desktop/build/QingYin-desktop-0.2.0.zip`，解压即用）
+- **构建**：`cd desktop && .\gradlew.bat createDistributable`；命令行验证解析链路：`.\gradlew.bat run --args="--cli <链接>"`
+- **代码复用**：解析器/下载器与 Android 版共用同一份纯 JVM 源码（`desktop/build.gradle.kts` 里通过共享源集引用），修改一处两端生效
+- 抖音解析依赖 Android WebView 浏览器环境，桌面端暂无等价方案，后续可评估 JCEF（内置 Chromium）支持
 
 ## 一、POC 快速验证（无需安卓环境）
 
@@ -124,6 +135,8 @@ APK 输出在 `android/app/build/outputs/apk/debug/app-debug.apk`。
 - [x] 抖音图集（图文笔记）无水印原图下载
 - [x] 抖音解析适配平台改版（WebView 方案，2026-08）
 - [x] 下载暂停 / 续传 / 删除
+- [x] **Windows 桌面版**（Compose Desktop + jpackage EXE，2026-08）
 - [ ] 下载队列、历史记录持久化
+- [ ] 桌面版支持抖音（JCEF 内置 Chromium 等方案评估）
 - [ ] 服务端解析引擎（yt-dlp），覆盖 YouTube 等更多平台
 - [ ] TikTok、西瓜视频 / 头条视频
