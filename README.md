@@ -38,8 +38,10 @@
 清印提供 **Windows 桌面版**（`desktop/` 工程，Compose Desktop + jpackage），无需安装 Java 即可运行：
 
 - **功能**：粘贴链接 → 解析 → 下载无水印视频 / 图集 → 保存到「下载\视频去水印」文件夹；支持 **B站 / 快手 / X(推特) / 小红书 / 微博**（抖音桌面版暂不支持，详见[维护记录](#六维护记录2026-08-抖音改版)）
-- **可执行文件**：`desktop/build/jpackage-app/QingYin/QingYin.exe`（或分发包 `desktop/build/QingYin-desktop-0.2.0.zip`，解压即用）
-- **构建**：`cd desktop && .\gradlew.bat createDistributable`；命令行验证解析链路：`.\gradlew.bat run --args="--cli <链接>"`
+- **安装方式**：
+  - 安装包（推荐）：`desktop/build/installer/QingYin-0.2.0.exe`（或 `.msi`），双击 → 下一步 → 完成，自动创建桌面快捷方式与开始菜单项（分发包 `desktop/build/QingYin-setup-0.2.0.zip`）
+  - 免安装版：`desktop/build/jpackage-app/QingYin/QingYin.exe`（解压即用，`app` 与 `runtime` 目录需与 exe 同目录）
+- **构建**：`cd desktop && .\gradlew.bat createDistributable`；安装包需额外安装 [WiX 3.x](https://wixtoolset.org)（jpackage 依赖 candle/light），生成方式见 `desktop/build.gradle.kts` 中的 `copyJpackageInput` 任务 + 手动 jpackage
 - **代码复用**：解析器/下载器与 Android 版共用同一份纯 JVM 源码（`desktop/build.gradle.kts` 里通过共享源集引用），修改一处两端生效
 - 抖音解析依赖 Android WebView 浏览器环境，桌面端暂无等价方案，后续可评估 JCEF（内置 Chromium）支持
 
