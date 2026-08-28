@@ -13,3 +13,4 @@ __pycache__/
 # Desktop
 desktop/.gradle/
 desktop/build/
+desktop/yt-dlp.exe

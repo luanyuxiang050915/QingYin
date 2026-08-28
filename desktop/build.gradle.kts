@@ -66,5 +66,9 @@ tasks.register<Copy>("copyJpackageInput") {
         rename { "app.jar" }
     }
     from(configurations.runtimeClasspath)
+    // 通用解析依赖 yt-dlp（随安装包分发，运行时放在 app/ 目录）
+    from("build/tools/yt-dlp.exe") {
+        into("app")
+    }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }

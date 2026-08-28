@@ -106,7 +106,7 @@ fun MainScreen(vm: DesktopViewModel) {
                         minLines = 2,
                         maxLines = 4,
                         placeholder = {
-                            Text("支持：B站 / 快手 / X(推特) / 小红书 / 微博\n（抖音暂未支持桌面版）\n例如：https://b23.tv/xxxx 或 https://v.kuaishou.com/xxx")
+                            Text("支持：B站 / 快手 / X(推特) / 小红书 / 微博\n以及任意网站视频链接（通用解析，1000+ 站点）\n例如：https://b23.tv/xxxx 或任意视频页面 URL")
                         }
                     )
 

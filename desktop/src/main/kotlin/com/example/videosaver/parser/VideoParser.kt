@@ -14,7 +14,11 @@ interface VideoParser {
 }
 
 object VideoParserManager {
-    /** 桌面版支持平台（抖音暂不支持：需 WebView 浏览器方案，仅 Android 可用） */
+    /**
+     * 解析器优先级：B站/快手/X/小红书/微博（自研，快速）
+     * → 通用（YtDlpParser，兜底，支持 Pornhub 等 1000+ 站点）
+     * 抖音桌面版暂不支持（需 WebView 浏览器方案，仅 Android 可用）。
+     */
     private val parsers: List<VideoParser> =
         listOf(
             BilibiliParser,
@@ -22,13 +26,14 @@ object VideoParserManager {
             XParser,
             XiaohongshuParser,
             WeiboParser,
+            YtDlpParser,
         )
 
     fun detect(text: String): VideoParser? = parsers.firstOrNull { it.matches(text) }
 
     suspend fun parse(text: String): VideoInfo {
         val parser = detect(text)
-            ?: throw ParseException("暂不支持该链接，桌面版支持：B站 / 快手 / X(推特) / 小红书 / 微博（抖音暂未支持）")
+            ?: throw ParseException("未找到可用的解析器，请粘贴有效的链接")
         return withContext(Dispatchers.IO) { parser.parse(text) }
     }
 }

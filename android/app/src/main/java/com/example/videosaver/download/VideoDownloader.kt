@@ -3,6 +3,7 @@ package com.example.videosaver.download
 import com.example.videosaver.net.Http
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
@@ -37,6 +38,13 @@ class VideoDownloader {
         }
         if (url.contains("weibocdn.com")) {
             builder.header("Referer", "https://weibo.com/")
+        }
+        // 通用防盗链：其余 CDN 按视频 URL 的域名带 Referer（Pornhub 等站点必需）
+        if (!url.contains("bilivideo.com") && !url.contains("twimg.com") && !url.contains("weibocdn.com")) {
+            val host = runCatching { url.toHttpUrlOrNull()?.host }.getOrNull()
+            if (!host.isNullOrBlank()) {
+                builder.header("Referer", "https://$host/")
+            }
         }
         if (resumeFrom > 0) {
             builder.header("Range", "bytes=$resumeFrom-")

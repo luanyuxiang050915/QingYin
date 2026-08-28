@@ -37,11 +37,12 @@
 
 清印提供 **Windows 桌面版**（`desktop/` 工程，Compose Desktop + jpackage），无需安装 Java 即可运行：
 
-- **功能**：粘贴链接 → 解析 → 下载无水印视频 / 图集 → 保存到「下载\视频去水印」文件夹；支持 **B站 / 快手 / X(推特) / 小红书 / 微博**（抖音桌面版暂不支持，详见[维护记录](#六维护记录2026-08-抖音改版)）
+- **功能**：粘贴链接 → 解析 → 下载无水印视频 / 图集 → 保存到「下载\视频去水印」文件夹；支持 **B站 / 快手 / X(推特) / 小红书 / 微博** + **任意网站视频链接（通用解析 yt-dlp，支持 Pornhub 等 1000+ 站点）**（抖音桌面版暂不支持，详见[维护记录](#六维护记录2026-08-抖音改版)）
+- **通用链接说明**：非自研平台链接自动走 yt-dlp（`yt-dlp.exe` 随安装包分发，位于 `app/` 目录）；仅支持直链 mp4（无需 ffmpeg），m3u8 分片流站点暂不支持
 - **安装方式**：
   - 安装包（推荐）：`desktop/build/installer/QingYin-0.2.0.exe`（或 `.msi`），双击 → 下一步 → 完成，自动创建桌面快捷方式与开始菜单项（分发包 `desktop/build/QingYin-setup-0.2.0.zip`）
   - 免安装版：`desktop/build/jpackage-app/QingYin/QingYin.exe`（解压即用，`app` 与 `runtime` 目录需与 exe 同目录）
-- **构建**：`cd desktop && .\gradlew.bat createDistributable`；安装包需额外安装 [WiX 3.x](https://wixtoolset.org)（jpackage 依赖 candle/light），生成方式见 `desktop/build.gradle.kts` 中的 `copyJpackageInput` 任务 + 手动 jpackage
+- **构建**：`cd desktop && .\gradlew.bat createDistributable`；安装包需额外安装 [WiX 3.x](https://wixtoolset.org)（jpackage 依赖 candle/light），生成方式见 `desktop/build.gradle.kts` 中的 `copyJpackageInput` 任务 + 手动 jpackage；通用链接需在 `desktop/build/tools/` 放置 `yt-dlp.exe`
 - **代码复用**：解析器/下载器与 Android 版共用同一份纯 JVM 源码（`desktop/build.gradle.kts` 里通过共享源集引用），修改一处两端生效
 - 抖音解析依赖 Android WebView 浏览器环境，桌面端暂无等价方案，后续可评估 JCEF（内置 Chromium）支持
 
@@ -138,7 +139,9 @@ APK 输出在 `android/app/build/outputs/apk/debug/app-debug.apk`。
 - [x] 抖音解析适配平台改版（WebView 方案，2026-08）
 - [x] 下载暂停 / 续传 / 删除
 - [x] **Windows 桌面版**（Compose Desktop + jpackage EXE，2026-08）
+- [x] **通用链接下载（yt-dlp）**：桌面版任意网站视频直链解析（Pornhub 等 1000+ 站点，2026-08）
 - [ ] 下载队列、历史记录持久化
+- [ ] 通用链接支持 m3u8 分片流（集成 ffmpeg）
 - [ ] 桌面版支持抖音（JCEF 内置 Chromium 等方案评估）
 - [ ] 服务端解析引擎（yt-dlp），覆盖 YouTube 等更多平台
 - [ ] TikTok、西瓜视频 / 头条视频
