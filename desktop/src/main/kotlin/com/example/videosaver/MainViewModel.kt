@@ -32,6 +32,10 @@ class DesktopViewModel {
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
+    /** 输入框内容（由 VM 持有，供 UI 与快捷键共享） */
+    private val _link = MutableStateFlow("")
+    val link: StateFlow<String> = _link.asStateFlow()
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val downloader = VideoDownloader()
     private val saver = DesktopSaver()
@@ -41,6 +45,12 @@ class DesktopViewModel {
     fun dispose() {
         scope.cancel()
     }
+
+    fun setLink(text: String) {
+        _link.value = text
+    }
+
+    fun currentLink(): String = _link.value
 
     fun parse(text: String) {
         if (text.isBlank()) {
@@ -114,6 +124,13 @@ class DesktopViewModel {
         }
     }
 
+    /** 打开已保存文件所在目录（系统资源管理器） */
+    fun openFolder(id: Long) {
+        val task = _state.value.tasks.firstOrNull { it.id == id } ?: return
+        val dir = task.savedFiles.firstOrNull()?.parentFile ?: task.file?.parentFile ?: return
+        runCatching { java.awt.Desktop.getDesktop().open(dir) }
+    }
+
     private fun runDownload(id: Long) {
         scope.launch {
             val dir = File(tempDir, "downloads").apply { mkdirs() }
@@ -144,10 +161,20 @@ class DesktopViewModel {
             }
 
             try {
+                // 速度/剩余时间计算（onProgress 高频回调）
+                var lastTime = System.currentTimeMillis()
+                var lastBytes = 0L
                 val outcome = downloader.download(
                     url = video.videoUrl,
                     dest = file,
                     onProgress = { downloaded, total ->
+                        val now = System.currentTimeMillis()
+                        val dt = now - lastTime
+                        val db = downloaded - lastBytes
+                        val speed = if (dt > 0) db * 1000 / dt else 0L
+                        lastTime = now
+                        lastBytes = downloaded
+                        val eta = if (speed > 0 && total > downloaded) (total - downloaded) / speed else 0L
                         _state.update { s ->
                             val t = s.tasks.firstOrNull { it.id == id } ?: return@update s
                             val progress =
@@ -159,6 +186,8 @@ class DesktopViewModel {
                                             progress = progress,
                                             bytesDownloaded = downloaded,
                                             totalBytes = total,
+                                            speedBps = speed,
+                                            etaSec = eta,
                                         )
                                     } else {
                                         it
