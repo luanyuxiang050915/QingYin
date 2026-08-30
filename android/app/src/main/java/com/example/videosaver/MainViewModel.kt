@@ -150,6 +150,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val outcome = downloader.download(
                     url = video.videoUrl,
                     dest = file,
+                    referer = video.referer.ifBlank { null },
                     onProgress = { downloaded, total ->
                         val now = System.currentTimeMillis()
                         val dt = now - lastTime
@@ -277,6 +278,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     downloader.download(
                         url = url,
                         dest = dest,
+                        referer = video.referer.ifBlank { null },
                         onProgress = { downloaded, totalBytes ->
                             val per =
                                 if (totalBytes > 0) (downloaded.toFloat() / totalBytes).coerceIn(0f, 1f) else 0f

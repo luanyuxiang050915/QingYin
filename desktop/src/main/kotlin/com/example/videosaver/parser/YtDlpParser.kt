@@ -45,6 +45,12 @@ object YtDlpParser : VideoParser {
             throw ParseException("该站点只有分片流（m3u8），暂不支持（需要 ffmpeg）")
         }
 
+        // 防盗链 Referer：用视频页面域名（如 Pornhub CDN 需要 pornhub 页面做来源）
+        val referer = Regex("^https?://([^/]+)").find(url)
+            ?.groupValues?.get(1)
+            ?.let { "https://$it/" }
+            .orEmpty()
+
         return VideoInfo(
             platform = platform,
             title = meta.optString("title").trim().ifBlank { "视频" },
@@ -52,6 +58,7 @@ object YtDlpParser : VideoParser {
             coverUrl = meta.optString("thumbnail").ifBlank { "" },
             videoUrl = direct,
             durationSec = meta.optLong("duration"),
+            referer = referer,
         )
     }
 

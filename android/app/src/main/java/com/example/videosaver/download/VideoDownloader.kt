@@ -20,27 +20,29 @@ class VideoDownloader {
     /**
      * 支持暂停/续传的下载：
      * - 目标文件已存在时，自动从已有字节数继续（服务端需支持 Range，不支持则从头下载）；
-     * - [shouldStop] 返回 true 时停止并保留已下载部分，之后可继续。
+     * - [shouldStop] 返回 true 时停止并保留已下载部分，之后可继续；
+     * - [referer] 显式指定防盗链 Referer（页面域名），为空时按已知平台/直链同域名推断。
      */
     suspend fun download(
         url: String,
         dest: File,
         onProgress: (downloaded: Long, total: Long) -> Unit,
         shouldStop: () -> Boolean,
+        referer: String? = null,
     ): DownloadOutcome = withContext(Dispatchers.IO) {
         val resumeFrom = if (dest.exists()) dest.length() else 0L
         val builder = Request.Builder().url(url).header("User-Agent", Http.UA_MOBILE)
-        if (url.contains("bilivideo.com") || url.contains("bilibili")) {
+        if (!referer.isNullOrBlank()) {
+            // 解析器提供的页面域名（如 Pornhub CDN 需要 pornhub 页面做来源）
+            builder.header("Referer", referer)
+        } else if (url.contains("bilivideo.com") || url.contains("bilibili")) {
             builder.header("Referer", "https://www.bilibili.com/")
-        }
-        if (url.contains("twimg.com")) {
+        } else if (url.contains("twimg.com")) {
             builder.header("Referer", "https://x.com/")
-        }
-        if (url.contains("weibocdn.com")) {
+        } else if (url.contains("weibocdn.com")) {
             builder.header("Referer", "https://weibo.com/")
-        }
-        // 通用防盗链：其余 CDN 按视频 URL 的域名带 Referer（Pornhub 等站点必需）
-        if (!url.contains("bilivideo.com") && !url.contains("twimg.com") && !url.contains("weibocdn.com")) {
+        } else {
+            // 通用兜底：按视频 URL 的域名带 Referer
             val host = runCatching { url.toHttpUrlOrNull()?.host }.getOrNull()
             if (!host.isNullOrBlank()) {
                 builder.header("Referer", "https://$host/")
