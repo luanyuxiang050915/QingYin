@@ -223,7 +223,7 @@ fun GradientButton(
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val scale by animateFloatAsState(if (hovered && enabled) 1.02f else 1f, label = "btnScale")
-    val backgroundBrush: Brush = if (enabled) BrandGradient else Brush.linearGradient(listOf(Color(0x33_8A90A5)))
+    val backgroundBrush: Brush = if (enabled) BrandGradient else Brush.linearGradient(listOf(Color(0x33_8A90A5), Color(0x33_8A90A5)))
     Box(
         modifier
             .graphicsLayer {
