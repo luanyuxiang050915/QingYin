@@ -27,7 +27,8 @@ object YtDlpParser : VideoParser {
             ?: throw ParseException("未找到链接，请粘贴视频页面 URL")
 
         // 1) 元数据
-        val metaOut = runYtDlp("--dump-json", "--no-warnings", url)
+        // 1) 元数据（带重试：Pornhub 等站点反爬会偶发 410/403，重试可自动跳过）
+        val metaOut = runYtDlpRetry("--dump-json", "--no-warnings", url)
         val meta = try {
             JSONObject(metaOut.trim().lineSequence().last { it.isNotBlank() })
         } catch (e: Exception) {
@@ -36,7 +37,7 @@ object YtDlpParser : VideoParser {
 
         // 2) 最佳直链 mp4（protocol^=http 排除 m3u8 分片流，不需要 ffmpeg）
         val direct = try {
-            runYtDlp("--get-url", "-f", "best[ext=mp4][protocol^=http]/best", "--no-warnings", url)
+            runYtDlpRetry("--get-url", "-f", "best[ext=mp4][protocol^=http]/best", "--no-warnings", url)
                 .trim().lineSequence().last { it.isNotBlank() }
         } catch (e: ParseException) {
             throw ParseException("获取直链失败：${e.message}")
@@ -60,6 +61,28 @@ object YtDlpParser : VideoParser {
             durationSec = meta.optLong("duration"),
             referer = referer,
         )
+    }
+
+    /**
+     * 带重试的 yt-dlp 调用（反爬偶发 410/403/空输出时自动重试，最多 [maxAttempts] 次）
+     */
+    private fun runYtDlpRetry(vararg args: String, maxAttempts: Int = 3): String {
+        var lastError: ParseException? = null
+        for (attempt in 1..maxAttempts) {
+            try {
+                // --extractor-retries 让 yt-dlp 内部对单个请求失败也做重试
+                val output = runYtDlp("--extractor-retries", "3", *args)
+                // 偶发空输出也视为失败
+                if (output.isNotBlank()) return output
+                lastError = ParseException("yt-dlp 输出为空")
+            } catch (e: ParseException) {
+                lastError = e
+            }
+            if (attempt < maxAttempts) {
+                Thread.sleep(1500L * attempt)
+            }
+        }
+        throw lastError ?: ParseException("yt-dlp 解析失败")
     }
 
     private fun runYtDlp(vararg args: String): String {
