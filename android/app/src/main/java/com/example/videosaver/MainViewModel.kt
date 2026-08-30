@@ -144,10 +144,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             try {
+                // 速度/剩余时间计算（onProgress 高频回调）
+                var lastTime = System.currentTimeMillis()
+                var lastBytes = 0L
                 val outcome = downloader.download(
                     url = video.videoUrl,
                     dest = file,
                     onProgress = { downloaded, total ->
+                        val now = System.currentTimeMillis()
+                        val dt = now - lastTime
+                        val db = downloaded - lastBytes
+                        val speed = if (dt > 0) db * 1000 / dt else 0L
+                        lastTime = now
+                        lastBytes = downloaded
+                        val eta = if (speed > 0 && total > downloaded) (total - downloaded) / speed else 0L
                         _state.update { s ->
                             val t = s.tasks.firstOrNull { it.id == id } ?: return@update s
                             val progress =
@@ -159,6 +169,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                             progress = progress,
                                             bytesDownloaded = downloaded,
                                             totalBytes = total,
+                                            speedBps = speed,
+                                            etaSec = eta,
                                         )
                                     } else {
                                         it
